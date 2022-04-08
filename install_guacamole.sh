@@ -8,6 +8,7 @@
 # Changelog	: 03/04/2022-Creation du script, hash
 # Changelog	: 04/04/2022-Vérification gpg
 # Changelog	: 07/04/2022-Ajout paquets et installation
+# Changelog	: 08/04/2022-Ajout installation guacamole-client, a corriger maven
 
 # Affiche les commandes réalisées
 set -x
@@ -92,6 +93,55 @@ function build_guacamole_server()
 
 	# Mettre à jour le cache du système des bibliothèques installés
 	ldconfig
+}
+
+function install_java_jdk()
+{
+	mkdir -vp /opt/java
+	cd /opt/java/
+
+	# Téléchargement de Java jdk
+	curl -O https://www.oracle.com/java/technologies/javase/javase8-archive-downloads.html#license-lightbox 
+
+	# Téléchargement du hash
+	curl -O https://download.oracle.com/java/18/latest/jdk-18_linux-x64_bin.tar.gz.sha256
+
+	# Vérification du hash
+	# A améliorer: que le hash soit bien formaté
+	sha256sum -c /opt/java/jdk-18_linux-x64_bin.tar.gz.sha256
+
+	tar zxvf jdk-18_linux-x64_bin.tar.gz
+	rm -v jdk-18_linux-x64_bin.tar.gz
+	rm -v jdk-18_linux-x64_bin.tar.gz.sha256
+}
+
+function guacamole_client()
+{
+	mkdir -vp /opt/guacamole/guacamole-client
+	cd /opt/guacamole/guacamole-client
+
+	# Téléchargement du client
+	curl -O https://downloads.apache.org/guacamole/1.4.0/source/guacamole-client-1.4.0.tar.gz 
+
+	# Téléchargement de la signature gpg
+	curl -O https://downloads.apache.org/guacamole/1.4.0/source/guacamole-client-1.4.0.tar.gz.asc
+
+	# Téléchargement du hash
+	curl -O https://downloads.apache.org/guacamole/1.4.0/source/guacamole-client-1.4.0.tar.gz.sha256
+
+	# Vérification du hash
+	sha256sum -c /opt/guacamole/guacamole-client/guacamole-client-1.4.0.tar.gz.sha256
+
+	# Vérification de la signature gpg
+	gpg --verify guacamole-client-1.4.0.tar.gz.asc guacamole-client-1.4.0.tar.gz
+
+	# Extraire le fichier tar
+	tar xzf guacamole-client-1.4.0.tar.gz
+
+	cd guacamole-client-1.4.0/
+
+	# Construction de Guacamole client
+	mvn package
 }
 
 clear
