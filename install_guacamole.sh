@@ -9,6 +9,7 @@
 # Changelog	: 04/04/2022-Vérification gpg
 # Changelog	: 07/04/2022-Ajout paquets et installation
 # Changelog	: 08/04/2022-Ajout installation guacamole-client, a corriger maven
+# Changelog	: 09/04/2022-Ajout java path, installation maven et path
 
 # Affiche les commandes réalisées
 set -x
@@ -101,7 +102,7 @@ function install_java_jdk()
 	cd /opt/java/
 
 	# Téléchargement de Java jdk
-	curl -O https://www.oracle.com/java/technologies/javase/javase8-archive-downloads.html#license-lightbox 
+	curl -O https://download.oracle.com/java/18/latest/jdk-18_linux-x64_bin.tar.gz
 
 	# Téléchargement du hash
 	curl -O https://download.oracle.com/java/18/latest/jdk-18_linux-x64_bin.tar.gz.sha256
@@ -113,6 +114,45 @@ function install_java_jdk()
 	tar zxvf jdk-18_linux-x64_bin.tar.gz
 	rm -v jdk-18_linux-x64_bin.tar.gz
 	rm -v jdk-18_linux-x64_bin.tar.gz.sha256
+
+	echo "export JAVA_HOME=/opt/java/jdk-18/" >> ~/.bashrc
+	source ~/.bashrc
+
+	cat > /etc/environment << "EOF"
+JAVA_HOME=/opt/java/jdk-18
+PATH=$PATH:$JAVA_HOME/bin
+
+EOF
+	source /etc/environment
+
+}
+
+function install_maven()
+{
+	mkdir -vp /opt/apache-maven/
+	cd /opt/apache-maven/
+
+	# Téléchargement de apache maven
+	curl -O https://dlcdn.apache.org/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz
+
+	# Téléchargement du hash
+	curl -O https://downloads.apache.org/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz.sha512
+
+	# Téléchargement de la signature
+	curl -O https://downloads.apache.org/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz.asc
+
+	# Téléchargement des cles publiques
+	curl -O https://downloads.apache.org/maven/KEYS
+
+	sha512sum -c /opt/apache-maven/apache-maven-3.8.5-bin.tar.gz.sha512
+
+	gpg --import KEYS
+	gpg --verify apache-maven-3.8.5-bin.tar.gz.asc apache-maven-3.8.5-bin.tar.gz
+
+	tar xzvf apache-maven-3.8.5-bin.tar.gz
+
+	echo "export PATH=/opt/apache-maven/apache-maven-3.8.5/bin:$PATH" >> ~/.bashrc
+	source ~/.bashrc
 }
 
 function guacamole_client()
