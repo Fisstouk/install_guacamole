@@ -10,6 +10,7 @@
 # Changelog	: 07/04/2022-Ajout paquets et installation
 # Changelog	: 08/04/2022-Ajout installation guacamole-client, a corriger maven
 # Changelog	: 09/04/2022-Ajout java path, installation maven et path
+# Changelog	: 28/04/2022-Refonte, installation apache tomcat
 
 # Affiche les commandes réalisées
 set -x
@@ -17,16 +18,105 @@ set -x
 # Arrête le script dès qu'un erreur survient
 set -e
 
+function synchronize_time()
+{
+	timedatectl set-ntp on
+	systemctl restart systemd-timesyncd
+	systemctl status systemd-timesyncd --no-pager
+}
+
 function download_tools()
 {
+	apt update && apt upgrade -y
 	apt install make vim curl git gnupg -y
+}
+
+function required_dependencies()
+{
+	apt install libcairo2-dev \ 			# Utilisé par libguac pour le rendu graphique
+		libjpeg62-turbo-dev \			# Support JPEG 
+		libpng-dev \				# Ecrit des images PNG, le format principal de Guacamole
+		libtool-bin \ 				# Crée des bibliothèques compilées pour installer Guacamole
+		uuid-dev \ 				# Permet d'assigner des identifiants uniques aux utilisateurs et connexions
+		libossp-uuid-dev \ 
+		freerdp2-dev \				# Support de RDP
+		libpango1.0-dev \ 			# Support SSH, Kubernetes et telnet
+		libssh2-1-dev \ 			# Support SSH et SFTP
+		libvncserver-dev \			# Support VNC
+		libssl-dev -y				# Support SSL et TLS
+}
+
+function install_tomcat()
+{
+	# Installation de Java Developement Kit
+	apt install default-jdk -y
+
+	# Création de l'utilisateur tomcat
+	# Sans privilège, personne ne peut s'y connecter
+	groupadd tomcat
+	useradd -s /bin/false -g tomcat -d /opt/tomcat tomcat
+
+	# Téléchargement de Tomcat
+	cd /tmp
+	curl -O https://downloads.apache.org/tomcat/tomcat-10/v10.0.20/bin/apache-tomcat-10.0.20.tar.gz
+	curl -O https://downloads.apache.org/tomcat/tomcat-10/v10.0.20/bin/apache-tomcat-10.0.20.tar.gz.asc
+	curl -O https://downloads.apache.org/tomcat/tomcat-10/v10.0.20/bin/apache-tomcat-10.0.20.tar.gz.sha512
+	curl -O https://downloads.apache.org/tomcat/tomcat-10/v10.0.20/KEYS
+
+	# Vérification de l'authenticité des fichiers téléchargés
+	gpg --import KEYS
+	gpg --verify apache-tomcat-10.0.20.tar.gz.asc apache-tomcat-10.0.20.tar.gz
+	sha512sum -c apache-tomcat-10.0.20.tar.gz.sha512
+
+	mkdir -vp /opt/tomcat
+	# Strip-components extrait tous les fichiers dans le dossier indiqué
+	tar xzvf apache-tomcat-10.0.20.tar.gz -C /opt/tomcat --strip-components=1
+
+	# Autorisations de l'utilisateur tomcat
+	cd /opt/tomcat
+	chgrp -R tomcat /opt/tomcat
+	chmod -R g+r conf
+	chmod g+x conf
+	chown -R tomcat webapps/ work/ temp/ logs/
+
+	cat >> /etc/systemd/system/tomcat.service << EOF
+[Unit]
+Description=Apache Tomcat Web Application Container
+After=network.target
+
+[Service]
+Type=forking
+
+Environment=JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64
+Environment=CATALINA_PID=/opt/tomcat/temp/tomcat.pid
+Environment=CATALINA_HOME=/opt/tomcat
+Environment=CATALINA_BASE=/opt/tomcat
+Environment='CATALINA_OPTS=-Xms512M -Xmx1024M -server -XX:+UseParallelGC'
+Environment='JAVA_OPTS=-Djava.awt.headless=true -Djava.security.egd=file:/dev/./urandom'
+
+ExecStart=/opt/tomcat/bin/startup.sh
+ExecStop=/opt/tomcat/bin/shutdown.sh
+
+User=tomcat
+Group=tomcat
+UMask=0007
+RestartSec=10
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+	systemctl daemon-reload
+	systemctl start tomcat
+	systemctl status tomcat
+
 }
 
 function download_guacamole_server()
 {
-
-	mkdir -vp /opt/guacamole/guacamole-server
-	cd /opt/guacamole/guacamole-server
+	cd /tmp
 
 	# Téléchargement le tar gz de guacamole-server
 	# -O conserve le même nom que le fichier téléchargé
@@ -61,27 +151,14 @@ function download_guacamole_server()
 
 }
 
-function required_dependencies()
-{
-	apt install libcairo2-dev \ 			# Utilisé par libguac pour le rendu graphique
-		libjpeg62-turbo-dev \			# Support JPEG 
-		libpng-dev \				# Ecrit des images PNG, le format principal de Guacamole
-		libtool-bin \ 				# Crée des bibliothèques compilées pour installer Guacamole
-		uuid-dev \ 				# Permet d'assigner des identifiants uniques aux utilisateurs et connexions
-		libossp-uuid-dev \ 
-		freerdp2-dev \				# Support de RDP
-		libpango1.0-dev \ 			# Support SSH, Kubernetes et telnet
-		libssh2-1-dev \ 			# Support SSH et SFTP
-		libvncserver-dev \			# Support VNC
-		libssl-dev -y				# Support SSL et TLS
-}
-
 function build_guacamole_server()
 {
+	mkdir -vp /opt/guacamole/guacamole-server
+	cd /tmp
 	# Extrait le code source de Guacamole	
-	tar xzf guacamole-server-1.4.0.tar.gz
+	tar xzf guacamole-server-1.4.0.tar.gz -C /opt/guacamole/guacamole-server --strip-components=1
 
-	cd guacamole-server-1.4.0
+	cd /opt/guacamole/guacamole-server
 
 	# Lancer configure pour déterminer les bibliothèques installées
 	./configure --with-init-dir=/etc/init.d
@@ -96,92 +173,31 @@ function build_guacamole_server()
 	ldconfig
 }
 
-function install_java_jdk()
-{
-	mkdir -vp /opt/java
-	cd /opt/java/
-
-	# Téléchargement de Java jdk
-	curl -O https://download.oracle.com/java/18/latest/jdk-18_linux-x64_bin.tar.gz
-
-	# Téléchargement du hash
-	curl -O https://download.oracle.com/java/18/latest/jdk-18_linux-x64_bin.tar.gz.sha256
-
-	# Vérification du hash
-	# A améliorer: que le hash soit bien formaté
-	sha256sum -c /opt/java/jdk-18_linux-x64_bin.tar.gz.sha256
-
-	tar zxvf jdk-18_linux-x64_bin.tar.gz
-	rm -v jdk-18_linux-x64_bin.tar.gz
-	rm -v jdk-18_linux-x64_bin.tar.gz.sha256
-
-	echo "export JAVA_HOME=/opt/java/jdk-18/" >> ~/.bashrc
-	source ~/.bashrc
-
-	cat > /etc/environment << "EOF"
-JAVA_HOME=/opt/java/jdk-18
-PATH=$PATH:$JAVA_HOME/bin
-
-EOF
-	source /etc/environment
-
-}
-
-function install_maven()
-{
-	mkdir -vp /opt/apache-maven/
-	cd /opt/apache-maven/
-
-	# Téléchargement de apache maven
-	curl -O https://dlcdn.apache.org/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz
-
-	# Téléchargement du hash
-	curl -O https://downloads.apache.org/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz.sha512
-
-	# Téléchargement de la signature
-	curl -O https://downloads.apache.org/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz.asc
-
-	# Téléchargement des cles publiques
-	curl -O https://downloads.apache.org/maven/KEYS
-
-	sha512sum -c /opt/apache-maven/apache-maven-3.8.5-bin.tar.gz.sha512
-
-	gpg --import KEYS
-	gpg --verify apache-maven-3.8.5-bin.tar.gz.asc apache-maven-3.8.5-bin.tar.gz
-
-	tar xzvf apache-maven-3.8.5-bin.tar.gz
-
-	echo "export PATH=/opt/apache-maven/apache-maven-3.8.5/bin:$PATH" >> ~/.bashrc
-	source ~/.bashrc
-}
-
 function guacamole_client()
 {
-	mkdir -vp /opt/guacamole/guacamole-client
-	cd /opt/guacamole/guacamole-client
+	cd /tmp
+	curl -O https://downloads.apache.org/guacamole/1.4.0/binary/guacamole-1.4.0.war
+	curl -O https://downloads.apache.org/guacamole/1.4.0/binary/guacamole-1.4.0.war.asc
+	curl -O https://downloads.apache.org/guacamole/1.4.0/binary/guacamole-1.4.0.war.sha256
+	curl -O https://downloads.apache.org/guacamole/KEYS
 
-	# Téléchargement du client
-	curl -O https://downloads.apache.org/guacamole/1.4.0/source/guacamole-client-1.4.0.tar.gz 
+	gpg --import KEYS 
+	gpg --verify guacamole-1.4.0.war.asc guacamole-1.4.0.war
+	sha256sum -c guacamole-1.4.0.war.sha256
 
-	# Téléchargement de la signature gpg
-	curl -O https://downloads.apache.org/guacamole/1.4.0/source/guacamole-client-1.4.0.tar.gz.asc
+	cp guacamole.war /opt/tomcat/webapps
 
-	# Téléchargement du hash
-	curl -O https://downloads.apache.org/guacamole/1.4.0/source/guacamole-client-1.4.0.tar.gz.sha256
-
-	# Vérification du hash
-	sha256sum -c /opt/guacamole/guacamole-client/guacamole-client-1.4.0.tar.gz.sha256
-
-	# Vérification de la signature gpg
-	gpg --verify guacamole-client-1.4.0.tar.gz.asc guacamole-client-1.4.0.tar.gz
-
-	# Extraire le fichier tar
-	tar xzf guacamole-client-1.4.0.tar.gz
-
-	cd guacamole-client-1.4.0/
-
-	# Construction de Guacamole client
-	mvn package
+	# Démarrage de tomcat et guacd
+	systemctl restart tomcat
+	/etc/init.d/guacd start
 }
 
 clear
+
+synchronize_time
+download_tools
+required_dependencies
+install_tomcat
+download_guacamole_server
+build_guacamole_server
+guacamole_client
