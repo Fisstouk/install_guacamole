@@ -48,19 +48,19 @@ function install_tomcat()
 
 	# Téléchargement de Tomcat
 	cd /tmp
-	curl -O https://downloads.apache.org/tomcat/tomcat-10/v10.0.20/bin/apache-tomcat-10.0.20.tar.gz
-	curl -O https://downloads.apache.org/tomcat/tomcat-10/v10.0.20/bin/apache-tomcat-10.0.20.tar.gz.asc
-	curl -O https://downloads.apache.org/tomcat/tomcat-10/v10.0.20/bin/apache-tomcat-10.0.20.tar.gz.sha512
-	curl -O https://downloads.apache.org/tomcat/tomcat-10/v10.0.20/KEYS
+	curl -O https://downloads.apache.org/tomcat/tomcat-9/v9.0.62/bin/apache-tomcat-9.0.62.tar.gz
+	curl -O https://downloads.apache.org/tomcat/tomcat-9/v9.0.62/bin/apache-tomcat-9.0.62.tar.gz.asc
+	curl -O https://downloads.apache.org/tomcat/tomcat-9/v9.0.62/bin/apache-tomcat-9.0.62.tar.gz.sha512
+	curl -O https://downloads.apache.org/tomcat/tomcat-9/KEYS
 
 	# Vérification de l'authenticité des fichiers téléchargés
 	gpg --import KEYS
-	gpg --verify apache-tomcat-10.0.20.tar.gz.asc apache-tomcat-10.0.20.tar.gz
-	sha512sum -c apache-tomcat-10.0.20.tar.gz.sha512
+	gpg --verify apache-tomcat-9.0.62.tar.gz.asc apache-tomcat-9.0.62.tar.gz
+	sha512sum -c apache-tomcat-9.0.62.tar.gz.sha512
 
 	mkdir -vp /opt/tomcat
 	# Strip-components extrait tous les fichiers dans le dossier indiqué
-	tar xzvf apache-tomcat-10.0.20.tar.gz -C /opt/tomcat --strip-components=1
+	tar xzvf apache-tomcat-9.0.62.tar.gz -C /opt/tomcat --strip-components=1
 
 	# Autorisations de l'utilisateur tomcat
 	cd /opt/tomcat
@@ -98,11 +98,14 @@ WantedBy=multi-user.target
 
 EOF
 	ufw allow 8080
+	# Autorise le port par défaut de guacd
+	ufw allow 4822
 	systemctl enable tomcat
 
 	systemctl daemon-reload
 	systemctl start tomcat
 	systemctl status tomcat
+	echo -e '\n'
 
 }
 
@@ -179,7 +182,57 @@ function guacamole_client()
 
 	cp guacamole-1.4.0.war /opt/guacamole/
 
+	# Création du fichier configuration principal de Guacamole
+	cat >> /opt/guacamole/guacamole.properties << EOF
+	guacd-hostname: guacamole.lyronn.local
+	guacd-port:	4822
+	user-mapping:	/opt/guacamole/user-mapping.xml
+
+EOF
+
+	GUAC_PASSWORD=$(echo -n admin | openssl md5)
+
+	cat >> /opt/guacamole/user-mapping.xml << EOF
+<user-mappin>
+
+	<!--Authentification et configuration par utilisateur-->
+	<authorize username="USERNAME" password="PASSWORD">
+		<protocol>vnc</protocol>
+		<param name="hostname">localhost</param>
+		<param name="port">5900</param>
+		<param name="password">VNCPASS</param>
+	</authorize>
+
+	<!--Autre utilisateur, mais utilise md5 pour hasher le mdp-->
+	<authorize
+		username="USERNAME2"
+		password="$GUAC_PASSWORD"
+		encoding="md5">
+	
+		<!--Première connexion-->
+		<conection name="Hardening">
+			<protocol>ssh</protocol>
+			<param name="hostname">192.168.1.100</param>
+			<param name="port">22</param>
+		</connection>
+		
+		<!--Deuxième connexion-->
+		<connection name="otherhost">
+			<protocol>vnc</protocol>
+			<param name="hostname">otherhost</param>
+			<param name="port">5900</param>
+			<param name="password">VNCPASS</param>
+		</connection>
+	</authorize>
+</user-mapping>
+
+EOF
+
+	# Lien entre l'application guacamole client et le client web
 	ln -s /opt/guacamole/guacamole-1.4.0.war /opt/tomcat/webapps
+
+	# Lien entre la configuration de guacamole et le serveur tomcat
+	ln -s /opt/guacamole/guacamole.properties /opt/tomcat/.guacamole
 
 	# Démarrage de tomcat et guacd
 	systemctl restart tomcat
