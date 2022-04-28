@@ -28,22 +28,12 @@ function synchronize_time()
 function download_tools()
 {
 	apt update && apt upgrade -y
-	apt install make vim curl git gnupg -y
+	apt install make vim curl git gnupg ufw -y
 }
 
 function required_dependencies()
 {
-	apt install libcairo2-dev \ 			# Utilisé par libguac pour le rendu graphique
-		libjpeg62-turbo-dev \			# Support JPEG 
-		libpng-dev \				# Ecrit des images PNG, le format principal de Guacamole
-		libtool-bin \ 				# Crée des bibliothèques compilées pour installer Guacamole
-		uuid-dev \ 				# Permet d'assigner des identifiants uniques aux utilisateurs et connexions
-		libossp-uuid-dev \ 
-		freerdp2-dev \				# Support de RDP
-		libpango1.0-dev \ 			# Support SSH, Kubernetes et telnet
-		libssh2-1-dev \ 			# Support SSH et SFTP
-		libvncserver-dev \			# Support VNC
-		libssl-dev -y				# Support SSL et TLS
+	apt install libcairo2-dev libjpeg62-turbo-dev libpng-dev libtool-bin uuid-dev libossp-uuid-dev freerdp2-dev libpango1.0-dev libssh2-1-dev libvncserver-dev libssl-dev -y
 }
 
 function install_tomcat()
@@ -107,6 +97,8 @@ Restart=always
 WantedBy=multi-user.target
 
 EOF
+	ufw allow 8080
+	systemctl enable tomcat
 
 	systemctl daemon-reload
 	systemctl start tomcat
@@ -132,7 +124,7 @@ function download_guacamole_server()
 	curl -O https://downloads.apache.org/guacamole/KEYS
 
 	# Vérification du hash
-	sha256sum -c /opt/guacamole/guacamole-server/guacamole-server-1.4.0.tar.gz.sha256
+	sha256sum -c guacamole-server-1.4.0.tar.gz.sha256
 
 	# Importation des clés gpp
 	gpg --import KEYS
@@ -185,7 +177,9 @@ function guacamole_client()
 	gpg --verify guacamole-1.4.0.war.asc guacamole-1.4.0.war
 	sha256sum -c guacamole-1.4.0.war.sha256
 
-	cp guacamole.war /opt/tomcat/webapps
+	cp guacamole-1.4.0.war /opt/guacamole/
+
+	ln -s /opt/guacamole/guacamole-1.4.0.war /opt/tomcat/webapps
 
 	# Démarrage de tomcat et guacd
 	systemctl restart tomcat
