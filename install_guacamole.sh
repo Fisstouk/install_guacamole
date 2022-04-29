@@ -101,7 +101,7 @@ function build_guacamole_server()
 function install_tomcat()
 {
 	apt install tomcat9 tomcat9-admin tomcat9-common tomcat9-user -y
-	systemtcl status tomcat9
+	systemtctl status tomcat9
 }
 
 function guacamole_client()
