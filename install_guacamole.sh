@@ -12,10 +12,7 @@
 # Changelog	: 09/04/2022-Ajout java path, installation maven et path
 # Changelog	: 28/04/2022-Refonte, installation apache tomcat
 
-# Affiche les commandes réalisées
 set -x
-
-# Arrête le script dès qu'un erreur survient
 set -e
 
 function synchronize_time()
@@ -34,79 +31,6 @@ function download_tools()
 function required_dependencies()
 {
 	apt install libcairo2-dev libjpeg62-turbo-dev libpng-dev libtool-bin uuid-dev libossp-uuid-dev freerdp2-dev libpango1.0-dev libssh2-1-dev libvncserver-dev libssl-dev -y
-}
-
-function install_tomcat()
-{
-	# Installation de Java Developement Kit
-	apt install default-jdk -y
-
-	# Création de l'utilisateur tomcat
-	# Sans privilège, personne ne peut s'y connecter
-	groupadd tomcat
-	useradd -s /bin/false -g tomcat -d /opt/tomcat tomcat
-
-	# Téléchargement de Tomcat
-	cd /tmp
-	curl -O https://downloads.apache.org/tomcat/tomcat-9/v9.0.62/bin/apache-tomcat-9.0.62.tar.gz
-	curl -O https://downloads.apache.org/tomcat/tomcat-9/v9.0.62/bin/apache-tomcat-9.0.62.tar.gz.asc
-	curl -O https://downloads.apache.org/tomcat/tomcat-9/v9.0.62/bin/apache-tomcat-9.0.62.tar.gz.sha512
-	curl -O https://downloads.apache.org/tomcat/tomcat-9/KEYS
-
-	# Vérification de l'authenticité des fichiers téléchargés
-	gpg --import KEYS
-	gpg --verify apache-tomcat-9.0.62.tar.gz.asc apache-tomcat-9.0.62.tar.gz
-	sha512sum -c apache-tomcat-9.0.62.tar.gz.sha512
-
-	mkdir -vp /opt/tomcat
-	# Strip-components extrait tous les fichiers dans le dossier indiqué
-	tar xzvf apache-tomcat-9.0.62.tar.gz -C /opt/tomcat --strip-components=1
-
-	# Autorisations de l'utilisateur tomcat
-	cd /opt/tomcat
-	chgrp -R tomcat /opt/tomcat
-	chmod -R g+r conf
-	chmod g+x conf
-	chown -R tomcat webapps/ work/ temp/ logs/
-
-	cat >> /etc/systemd/system/tomcat.service << EOF
-[Unit]
-Description=Apache Tomcat Web Application Container
-After=network.target
-
-[Service]
-Type=forking
-
-Environment=JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64
-Environment=CATALINA_PID=/opt/tomcat/temp/tomcat.pid
-Environment=CATALINA_HOME=/opt/tomcat
-Environment=CATALINA_BASE=/opt/tomcat
-Environment='CATALINA_OPTS=-Xms512M -Xmx1024M -server -XX:+UseParallelGC'
-Environment='JAVA_OPTS=-Djava.awt.headless=true -Djava.security.egd=file:/dev/./urandom'
-
-ExecStart=/opt/tomcat/bin/startup.sh
-ExecStop=/opt/tomcat/bin/shutdown.sh
-
-User=tomcat
-Group=tomcat
-UMask=0007
-RestartSec=10
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-
-EOF
-	ufw allow 8080
-	# Autorise le port par défaut de guacd
-	ufw allow 4822
-	systemctl enable tomcat
-
-	systemctl daemon-reload
-	systemctl start tomcat
-	systemctl status tomcat
-	echo -e '\n'
-
 }
 
 function download_guacamole_server()
@@ -166,6 +90,18 @@ function build_guacamole_server()
 
 	# Mettre à jour le cache du système des bibliothèques installés
 	ldconfig
+
+	# Activer le service
+	systemctl enable guacd
+
+	# Démarrer le service
+	systemctl start guacd
+}
+
+function install_tomcat()
+{
+	apt install tomcat9 tomcat9-admin tomcat9-common tomcat9-user -y
+	systemtcl status tomcat9
 }
 
 function guacamole_client()
@@ -193,7 +129,7 @@ EOF
 	GUAC_PASSWORD=$(echo -n admin | openssl md5)
 
 	cat >> /opt/guacamole/user-mapping.xml << EOF
-<user-mappin>
+<user-mapping>
 
 	<!--Authentification et configuration par utilisateur-->
 	<authorize username="USERNAME" password="PASSWORD">
@@ -244,7 +180,7 @@ clear
 synchronize_time
 download_tools
 required_dependencies
-install_tomcat
 download_guacamole_server
 build_guacamole_server
+install_tomcat
 guacamole_client
