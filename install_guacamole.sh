@@ -165,10 +165,10 @@ EOF
 EOF
 
 	# Lien entre l'application guacamole client et le client web
-	ln -s /opt/guacamole/guacamole-1.4.0.war /opt/tomcat/webapps
+	ln -s /opt/guacamole/guacamole-1.4.0.war /var/lib/tomcat9/webapps
 
 	# Lien entre la configuration de guacamole et le serveur tomcat
-	ln -s /opt/guacamole/guacamole.properties /opt/tomcat/.guacamole
+	ln -s /opt/guacamole/guacamole.properties /usr/share/tomcat9/.guacamole
 
 	# Démarrage de tomcat et guacd
 	systemctl restart tomcat
