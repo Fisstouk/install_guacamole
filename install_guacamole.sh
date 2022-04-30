@@ -15,8 +15,8 @@
 set -x
 set -e
 
-GUAC_VERSION=$GUAC_VERSION
-JDBC_VERSION=$JDBC_VERSION
+GUAC_VERSION=1.4.0
+JDBC_VERSION=8.0.29
 
 function synchronize_time()
 {
