@@ -65,12 +65,12 @@ function download_guacamole_server()
 
 function build_guacamole_server()
 {
-	mkdir -vp /opt/guacamole/guacamole-server
+	mkdir -vp /etc/guacamole/guacamole-server
 	cd /tmp
 	# Extrait le code source de Guacamole	
-	tar xzf guacamole-server-$GUAC_VERSION.tar.gz -C /opt/guacamole/guacamole-server --strip-components=1
+	tar xzf guacamole-server-$GUAC_VERSION.tar.gz -C /etc/guacamole/guacamole-server --strip-components=1
 
-	cd /opt/guacamole/guacamole-server
+	cd /etc/guacamole/guacamole-server
 
 	# Lancer configure pour déterminer les bibliothèques installées
 	./configure --with-init-dir=/etc/init.d
@@ -109,13 +109,13 @@ function guacamole_client()
 	gpg --verify guacamole-$GUAC_VERSION.war.asc guacamole-$GUAC_VERSION.war
 	sha256sum -c guacamole-$GUAC_VERSION.war.sha256
 
-	cp guacamole-$GUAC_VERSION.war /opt/guacamole/guacamole.war
+	cp guacamole-$GUAC_VERSION.war /etc/guacamole/guacamole.war
 
 	# Lier guacamole client et tomcat
-	echo "GUACAMOLE_HOME=/opt/guacamole" >> /etc/default/tomcat9
+	echo "GUACAMOLE_HOME=/etc/guacamole" >> /etc/default/tomcat9
 
 	# Lien entre l'application guacamole client et le client web
-	ln -s /opt/guacamole/guacamole.war /var/lib/tomcat9/webapps
+	ln -s /etc/guacamole/guacamole.war /var/lib/tomcat9/webapps
 
 	# Démarrage de tomcat et guacd
 	systemctl restart tomcat9
@@ -125,8 +125,8 @@ function guacamole_client()
 install_mariadb()
 {
 	# Création des dossiers où seront installés les extensions
-	mkdir -vp /opt/guacamole/extensions/
-	mkdir -vp /opt/guacamole/lib/
+	mkdir -vp /etc/guacamole/extensions/
+	mkdir -vp /etc/guacamole/lib/
 
 	# Installation de mariadb
 	apt install mariadb-server mariadb-client -y
@@ -142,7 +142,7 @@ install_mariadb()
 	tar xzf guacamole-auth-jdbc-$GUAC_VERSION.tar.gz
 
 	# Ajouter les tables dans la bdd
-	cat guacamole-auth-jdbc-$GUAC_VERSION/mysql/schema/*.sql | mysql -u root -p guacamole_db
+	cat guacamole-auth-jdbc-$GUAC_VERSION/mysql/schema/*.sql | mysql guacamole_db
 
 	# Autoriser Guacamole à accéder à la bdd
 	# Création de l'utilisateur
@@ -155,7 +155,7 @@ install_mariadb()
 	mysql -e "FLUSH PRIVILEGES;"
 
 	# Installation de l'extension
-	cp guacamole-auth-jdbc-$GUAC_VERSION/mysql/guacamole-auth-jdbc-mysql-$GUAC_VERSION.jar /opt/guacamole/extensions/
+	cp guacamole-auth-jdbc-$GUAC_VERSION/mysql/guacamole-auth-jdbc-mysql-$GUAC_VERSION.jar /etc/guacamole/extensions/
 
 	# Téléchargement du driver JDBC
 	wget https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-$JDBC_VERSION.tar.gz
@@ -163,10 +163,10 @@ install_mariadb()
 	tar xvzf mysql-connector-java-$JDBC_VERSION.tar.gz
 
 	# Installer le driver pour Guacamole
-	cp mysql-connector-java-$JDBC_VERSION/mysql-connector-java-$JDBC_VERSION.jar /opt/guacamole/lib/
+	cp mysql-connector-java-$JDBC_VERSION/mysql-connector-java-$JDBC_VERSION.jar /etc/guacamole/lib/
 
 	# Ajouter la configuration de mariadb dans guacamole.properties
-	cat >> /opt/guacamole/guacamole.properties << EOF
+	cat >> /etc/guacamole/guacamole.properties << EOF
 # Hôte et port
 guacd-hostname: guacamole.lyronn.local
 guacd-port:	4822
@@ -180,7 +180,7 @@ mysql-password:	P@ssw0rd
 
 EOF
 	# Lien entre la configuration de guacamole et le serveur tomcat
-	ln -s /opt/guacamole/guacamole.properties /usr/share/tomcat9/.guacamole
+	ln -s /etc/guacamole/guacamole.properties /usr/share/tomcat9/.guacamole
 
 	systemctl restart tomcat9
 	systemctl restart guacd 
