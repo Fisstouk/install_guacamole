@@ -129,7 +129,7 @@ install_mariadb()
 	mkdir -vp /opt/guacamole/lib/
 
 	# Installation de mariadb
-	apt install mariadb-server mariadb-client
+	apt install mariadb-server mariadb-client -y
 
 	# Création de la bdd guacamole
 	mysql -e "CREATE DATABASE guacamole_db;"
@@ -151,7 +151,7 @@ install_mariadb()
 	tar xzf guacamole-auth-jdbc-1.4.0.tar.gz
 
 	# Ajouter les tables dans la bdd
-	cat guacamole-auth-jdbc-1.4.0/mysql/schema/*.sql | mysql guacamole_db
+	cat guacamole-auth-jdbc-1.4.0/mysql/schema/*.sql | mysql -u root -p  guacamole_db
 
 	# Installation de l'extension
 	cp guacamole-auth-jdbc-1.4.0/mysql/guacamole-auth-jdbc-mysql-1.4.0.jar /opt/guacamole/extensions/
@@ -171,7 +171,7 @@ guacd-hostname: guacamole.lyronn.local
 guacd-port:	4822
 
 # Parmètres MySQL
-mysql-hostname:	localhost
+mysql-hostname: guacamole.lyronn.local	
 mysql-port:	3306
 mysql-database:	guacamole_db
 mysql-username:	guacamole_user
