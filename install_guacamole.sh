@@ -88,7 +88,7 @@ function build_guacamole_server()
 	# Lancer l'installation
 	make install
 
-	# Mettre à jour le cache du système des bibliothèques installés
+	# Mettre à jour le cache du système des bibliothèques installées
 	ldconfig
 
 	# Activer le service
@@ -116,13 +116,13 @@ function guacamole_client()
 	gpg --verify guacamole-1.4.0.war.asc guacamole-1.4.0.war
 	sha256sum -c guacamole-1.4.0.war.sha256
 
-	cp guacamole-1.4.0.war /opt/guacamole/
+	cp guacamole-1.4.0.war /opt/guacamole/guacamole.war
 
 	# Création du fichier configuration principal de Guacamole
 	cat >> /opt/guacamole/guacamole.properties << EOF
-	guacd-hostname: guacamole.lyronn.local
-	guacd-port:	4822
-	user-mapping:	/opt/guacamole/user-mapping.xml
+guacd-hostname: guacamole.lyronn.local
+guacd-port:	4822
+user-mapping:	/opt/guacamole/user-mapping.xml
 
 EOF
 
@@ -164,15 +164,18 @@ EOF
 
 EOF
 
+	# Lier guacamole client et tomcat
+	echo "GUACAMOLE_HOME=/opt/guacamole" >> /etc/default/tomcat9
+
 	# Lien entre l'application guacamole client et le client web
-	ln -s /opt/guacamole/guacamole-1.4.0.war /var/lib/tomcat9/webapps
+	ln -s /opt/guacamole/guacamole.war /var/lib/tomcat9/webapps
 
 	# Lien entre la configuration de guacamole et le serveur tomcat
 	ln -s /opt/guacamole/guacamole.properties /usr/share/tomcat9/.guacamole
 
 	# Démarrage de tomcat et guacd
-	systemctl restart tomcat
-	/etc/init.d/guacd start
+	systemctl restart tomcat9
+	systemctl restart guacd 
 }
 
 clear
