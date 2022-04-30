@@ -4,7 +4,7 @@
 # Description	: Script d'installation en local
 # Version	: 0.1
 # Auteur	: Lyronn
-# Date		: 03/04/2022
+# Date		: 30/04/2022
 # Changelog	: 03/04/2022-Creation du script, hash
 # Changelog	: 04/04/2022-Vérification gpg
 # Changelog	: 07/04/2022-Ajout paquets et installation
@@ -25,7 +25,7 @@ function synchronize_time()
 function download_tools()
 {
 	apt update && apt upgrade -y
-	apt install make vim curl git gnupg ufw -y
+	apt install make vim curl git gnupg -y
 }
 
 function required_dependencies()
@@ -58,16 +58,6 @@ function download_guacamole_server()
 	
 	# Vérification de la signature gpg
 	gpg --verify guacamole-server-1.4.0.tar.gz.asc guacamole-server-1.4.0.tar.gz
-
-	# Tentative de gestion d'erreur pour le hash
-	#SHACHECK=$(sha256sum -c ~/guacamole-server-1.4.0.tar.gz.sha256)
-
-	#while ! $SHACHECK | grep 'OK'
-	#do
-	#	rm ~/guacamole-server-1.4.0.tar.gz
-	#	curl -O https://downloads.apache.org/guacamole/1.4.0/source/guacamole-server-1.4.0.tar.gz
-	#done
-
 }
 
 function build_guacamole_server()
@@ -101,7 +91,7 @@ function build_guacamole_server()
 function install_tomcat()
 {
 	apt install tomcat9 tomcat9-admin tomcat9-common tomcat9-user -y
-	systemctl status tomcat9
+	# systemctl status tomcat9
 }
 
 function guacamole_client()
@@ -118,52 +108,6 @@ function guacamole_client()
 
 	cp guacamole-1.4.0.war /opt/guacamole/guacamole.war
 
-	# Création du fichier configuration principal de Guacamole
-	cat >> /opt/guacamole/guacamole.properties << EOF
-guacd-hostname: guacamole.lyronn.local
-guacd-port:	4822
-user-mapping:	/opt/guacamole/user-mapping.xml
-
-EOF
-
-	GUAC_PASSWORD=$(echo -n admin | openssl md5)
-
-	cat >> /opt/guacamole/user-mapping.xml << EOF
-<user-mapping>
-
-	<!--Authentification et configuration par utilisateur-->
-	<authorize username="USERNAME" password="PASSWORD">
-		<protocol>vnc</protocol>
-		<param name="hostname">localhost</param>
-		<param name="port">5900</param>
-		<param name="password">VNCPASS</param>
-	</authorize>
-
-	<!--Autre utilisateur, mais utilise md5 pour hasher le mdp-->
-	<authorize
-		username="USERNAME2"
-		password="$GUAC_PASSWORD"
-		encoding="md5">
-	
-		<!--Première connexion-->
-		<conection name="Hardening">
-			<protocol>ssh</protocol>
-			<param name="hostname">192.168.1.100</param>
-			<param name="port">22</param>
-		</connection>
-		
-		<!--Deuxième connexion-->
-		<connection name="otherhost">
-			<protocol>vnc</protocol>
-			<param name="hostname">otherhost</param>
-			<param name="port">5900</param>
-			<param name="password">VNCPASS</param>
-		</connection>
-	</authorize>
-</user-mapping>
-
-EOF
-
 	# Lier guacamole client et tomcat
 	echo "GUACAMOLE_HOME=/opt/guacamole" >> /etc/default/tomcat9
 
@@ -178,6 +122,68 @@ EOF
 	systemctl restart guacd 
 }
 
+install_mariadb()
+{
+	# Création des dossiers où seront installés les extensions
+	mkdir -vp /opt/guacamole/extensions/
+	mkdir -vp /opt/guacamole/lib/
+
+	# Installation de mariadb
+	apt install mariadb-server mariadb-client
+
+	# Création de la bdd guacamole
+	mysql -e "CREATE DATABASE guacamole_db;"
+
+	# Création de l'utilisateur
+	mysql -e "CREATE USER 'guacamole_user'@'localhost' IDENTIFIED BY 'P@ssw0rd';"
+
+	# Attribution des droits à l'utilisateur guacamole_user
+	mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE ON guacamole_db.* TO 'guacamole_user'@'localhost';"
+
+	# Mise à jour de la bdd
+	mysql -e "FLUSH PRIVILEGES;"
+
+	cd /tmp/
+
+	# Téléchargement de l'extension mysql pour Guacamole
+	curl -O https://downloads.apache.org/guacamole/1.4.0/binary/guacamole-auth-jdbc-1.4.0.tar.gz
+
+	tar xzf guacamole-auth-jdbc-1.4.0.tar.gz
+
+	# Ajouter les tables dans la bdd
+	cat guacamole-auth-jdbc-1.4.0/mysql/schema/*.sql | mysql guacamole_db
+
+	# Installation de l'extension
+	cp guacamole-auth-jdbc-1.4.0/mysql/guacamole-auth-jdbc-mysql-1.4.0.jar /opt/guacamole/extensions/
+
+	# Téléchargement du driver JDBC
+	wget https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-8.0.29.tar.gz
+
+	tar xvzf mysql-connector-java-8.0.29.tar.gz
+
+	# Installer le driver pour Guacamole
+	cp mysql-connector-java-8.0.29/mysql-connector-java-8.0.29.jar /opt/guacamole/lib/
+
+	# Ajouter la configuration de mariadb dans guacamole.properties
+	cat >> /opt/guacamole/guacamole.properties << EOF
+# Hôte et port
+guacd-hostname: guacamole.lyronn.local
+guacd-port:	4822
+
+# Parmètres MySQL
+mysql-hostname:	localhost
+mysql-port:	3306
+mysql-database:	guacamole_db
+mysql-username:	guacamole_user
+mysql-password:	P@ssw0rd
+
+EOF
+
+systemctl restart tomcat9
+systemctl restart guacd 
+
+}
+
 clear
 
 synchronize_time
@@ -187,3 +193,4 @@ download_guacamole_server
 build_guacamole_server
 install_tomcat
 guacamole_client
+install_mariadb
