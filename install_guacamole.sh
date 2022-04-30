@@ -15,7 +15,7 @@
 set -x
 set -e
 
-GUAC_VERSION=1.3.0
+GUAC_VERSION=1.4.0
 JDBC_VERSION=8.0.29
 
 function synchronize_time()
@@ -73,7 +73,7 @@ function build_guacamole_server()
 	cd /opt/guacamole/guacamole-server
 
 	# Lancer configure pour déterminer les bibliothèques installées
-	./configure --with-init-dir=/opt/init.d
+	./configure --with-init-dir=/etc/init.d
 
 	# Lancer make pour démarrer la compilation 
 	make
@@ -112,7 +112,7 @@ function guacamole_client()
 	cp guacamole-$GUAC_VERSION.war /opt/guacamole/guacamole.war
 
 	# Lier guacamole client et tomcat
-	echo "GUACAMOLE_HOME=/opt/guacamole" >> /opt/default/tomcat9
+	echo "GUACAMOLE_HOME=/opt/guacamole" >> /etc/default/tomcat9
 
 	# Lien entre l'application guacamole client et le client web
 	ln -s /opt/guacamole/guacamole.war /var/lib/tomcat9/webapps
@@ -142,7 +142,7 @@ install_mariadb()
 	tar xzf guacamole-auth-jdbc-$GUAC_VERSION.tar.gz
 
 	# Ajouter les tables dans la bdd
-	cat guacamole-auth-jdbc-$GUAC_VERSION/mysql/schema/*.sql | mysql guacamole_db
+	cat guacamole-auth-jdbc-$GUAC_VERSION/mysql/schema/*.sql | mysql -u root -p guacamole_db
 
 	# Autoriser Guacamole à accéder à la bdd
 	# Création de l'utilisateur
