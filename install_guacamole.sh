@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Nom		: Installation de Guacamole 1.4.0
+# Nom		: Installation de Guacamole $GUAC_VERSION
 # Description	: Script d'installation en local
 # Version	: 0.1
 # Auteur	: Lyronn
@@ -14,6 +14,9 @@
 
 set -x
 set -e
+
+GUAC_VERSION=$GUAC_VERSION
+JDBC_VERSION=$JDBC_VERSION
 
 function synchronize_time()
 {
@@ -39,25 +42,25 @@ function download_guacamole_server()
 
 	# Téléchargement le tar gz de guacamole-server
 	# -O conserve le même nom que le fichier téléchargé
-	curl -O https://downloads.apache.org/guacamole/1.4.0/source/guacamole-server-1.4.0.tar.gz 
+	curl -O https://downloads.apache.org/guacamole/$GUAC_VERSION/source/guacamole-server-$GUAC_VERSION.tar.gz 
 
 	# Téléchargement de la signature gpg
-	curl -O https://downloads.apache.org/guacamole/1.4.0/source/guacamole-server-1.4.0.tar.gz.asc
+	curl -O https://downloads.apache.org/guacamole/$GUAC_VERSION/source/guacamole-server-$GUAC_VERSION.tar.gz.asc
 
 	# Téléchargement de la signature sha256
-	curl -O https://downloads.apache.org/guacamole/1.4.0/source/guacamole-server-1.4.0.tar.gz.sha256
+	curl -O https://downloads.apache.org/guacamole/$GUAC_VERSION/source/guacamole-server-$GUAC_VERSION.tar.gz.sha256
 
 	# Téléchargement des clés gpg
 	curl -O https://downloads.apache.org/guacamole/KEYS
 
 	# Vérification du hash
-	sha256sum -c guacamole-server-1.4.0.tar.gz.sha256
+	sha256sum -c guacamole-server-$GUAC_VERSION.tar.gz.sha256
 
 	# Importation des clés gpp
 	gpg --import KEYS
 	
 	# Vérification de la signature gpg
-	gpg --verify guacamole-server-1.4.0.tar.gz.asc guacamole-server-1.4.0.tar.gz
+	gpg --verify guacamole-server-$GUAC_VERSION.tar.gz.asc guacamole-server-$GUAC_VERSION.tar.gz
 }
 
 function build_guacamole_server()
@@ -65,7 +68,7 @@ function build_guacamole_server()
 	mkdir -vp /opt/guacamole/guacamole-server
 	cd /tmp
 	# Extrait le code source de Guacamole	
-	tar xzf guacamole-server-1.4.0.tar.gz -C /opt/guacamole/guacamole-server --strip-components=1
+	tar xzf guacamole-server-$GUAC_VERSION.tar.gz -C /opt/guacamole/guacamole-server --strip-components=1
 
 	cd /opt/guacamole/guacamole-server
 
@@ -97,16 +100,16 @@ function install_tomcat()
 function guacamole_client()
 {
 	cd /tmp
-	curl -O https://downloads.apache.org/guacamole/1.4.0/binary/guacamole-1.4.0.war
-	curl -O https://downloads.apache.org/guacamole/1.4.0/binary/guacamole-1.4.0.war.asc
-	curl -O https://downloads.apache.org/guacamole/1.4.0/binary/guacamole-1.4.0.war.sha256
+	curl -O https://downloads.apache.org/guacamole/$GUAC_VERSION/binary/guacamole-$GUAC_VERSION.war
+	curl -O https://downloads.apache.org/guacamole/$GUAC_VERSION/binary/guacamole-$GUAC_VERSION.war.asc
+	curl -O https://downloads.apache.org/guacamole/$GUAC_VERSION/binary/guacamole-$GUAC_VERSION.war.sha256
 	curl -O https://downloads.apache.org/guacamole/KEYS
 
 	gpg --import KEYS 
-	gpg --verify guacamole-1.4.0.war.asc guacamole-1.4.0.war
-	sha256sum -c guacamole-1.4.0.war.sha256
+	gpg --verify guacamole-$GUAC_VERSION.war.asc guacamole-$GUAC_VERSION.war
+	sha256sum -c guacamole-$GUAC_VERSION.war.sha256
 
-	cp guacamole-1.4.0.war /opt/guacamole/guacamole.war
+	cp guacamole-$GUAC_VERSION.war /opt/guacamole/guacamole.war
 
 	# Lier guacamole client et tomcat
 	echo "GUACAMOLE_HOME=/opt/guacamole" >> /etc/default/tomcat9
@@ -137,12 +140,12 @@ install_mariadb()
 	cd /tmp/
 
 	# Téléchargement de l'extension mysql pour Guacamole
-	curl -O https://downloads.apache.org/guacamole/1.4.0/binary/guacamole-auth-jdbc-1.4.0.tar.gz
+	curl -O https://downloads.apache.org/guacamole/$GUAC_VERSION/binary/guacamole-auth-jdbc-$GUAC_VERSION.tar.gz
 
-	tar xzf guacamole-auth-jdbc-1.4.0.tar.gz
+	tar xzf guacamole-auth-jdbc-$GUAC_VERSION.tar.gz
 
 	# Ajouter les tables dans la bdd
-	cat guacamole-auth-jdbc-1.4.0/mysql/schema/*.sql | mysql -u root -p  guacamole_db
+	cat guacamole-auth-jdbc-$GUAC_VERSION/mysql/schema/*.sql | mysql -u root -p  guacamole_db
 
 	# Autoriser Guacamole à accéder à la bdd
 	# Création de l'utilisateur
@@ -155,15 +158,15 @@ install_mariadb()
 	mysql -e "FLUSH PRIVILEGES;"
 
 	# Installation de l'extension
-	cp guacamole-auth-jdbc-1.4.0/mysql/guacamole-auth-jdbc-mysql-1.4.0.jar /opt/guacamole/extensions/
+	cp guacamole-auth-jdbc-$GUAC_VERSION/mysql/guacamole-auth-jdbc-mysql-$GUAC_VERSION.jar /opt/guacamole/extensions/
 
 	# Téléchargement du driver JDBC
-	wget https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-8.0.29.tar.gz
+	wget https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-$JDBC_VERSION.tar.gz
 
-	tar xvzf mysql-connector-java-8.0.29.tar.gz
+	tar xvzf mysql-connector-java-$JDBC_VERSION.tar.gz
 
 	# Installer le driver pour Guacamole
-	cp mysql-connector-java-8.0.29/mysql-connector-java-8.0.29.jar /opt/guacamole/lib/
+	cp mysql-connector-java-$JDBC_VERSION/mysql-connector-java-$JDBC_VERSION.jar /opt/guacamole/lib/
 
 	# Ajouter la configuration de mariadb dans guacamole.properties
 	cat >> /opt/guacamole/guacamole.properties << EOF
