@@ -117,9 +117,6 @@ function guacamole_client()
 	# Lien entre l'application guacamole client et le client web
 	ln -s /opt/guacamole/guacamole.war /var/lib/tomcat9/webapps
 
-	# Lien entre la configuration de guacamole et le serveur tomcat
-	ln -s /opt/guacamole/guacamole.properties /usr/share/tomcat9/.guacamole
-
 	# Démarrage de tomcat et guacd
 	systemctl restart tomcat9
 	systemctl restart guacd 
@@ -145,7 +142,7 @@ install_mariadb()
 	tar xzf guacamole-auth-jdbc-$GUAC_VERSION.tar.gz
 
 	# Ajouter les tables dans la bdd
-	cat guacamole-auth-jdbc-$GUAC_VERSION/mysql/schema/*.sql | mysql -u root -p  guacamole_db
+	cat guacamole-auth-jdbc-$GUAC_VERSION/mysql/schema/*.sql | mysql -u root -p guacamole_db
 
 	# Autoriser Guacamole à accéder à la bdd
 	# Création de l'utilisateur
@@ -182,9 +179,11 @@ mysql-username:	guacamole_user
 mysql-password:	P@ssw0rd
 
 EOF
+	# Lien entre la configuration de guacamole et le serveur tomcat
+	ln -s /opt/guacamole/guacamole.properties /usr/share/tomcat9/.guacamole
 
-systemctl restart tomcat9
-systemctl restart guacd 
+	systemctl restart tomcat9
+	systemctl restart guacd 
 
 }
 
