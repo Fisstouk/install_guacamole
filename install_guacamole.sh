@@ -134,15 +134,6 @@ install_mariadb()
 	# Création de la bdd guacamole
 	mysql -e "CREATE DATABASE guacamole_db;"
 
-	# Création de l'utilisateur
-	mysql -e "CREATE USER 'guacamole_user'@'localhost' IDENTIFIED BY 'P@ssw0rd';"
-
-	# Attribution des droits à l'utilisateur guacamole_user
-	mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE ON guacamole_db.* TO 'guacamole_user'@'localhost';"
-
-	# Mise à jour de la bdd
-	mysql -e "FLUSH PRIVILEGES;"
-
 	cd /tmp/
 
 	# Téléchargement de l'extension mysql pour Guacamole
@@ -152,6 +143,16 @@ install_mariadb()
 
 	# Ajouter les tables dans la bdd
 	cat guacamole-auth-jdbc-1.4.0/mysql/schema/*.sql | mysql -u root -p  guacamole_db
+
+	# Autoriser Guacamole à accéder à la bdd
+	# Création de l'utilisateur
+	mysql -e "CREATE USER 'guacamole_user'@'localhost' IDENTIFIED BY 'P@ssw0rd';"
+
+	# Attribution des droits à l'utilisateur guacamole_user
+	mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE ON guacamole_db.* TO 'guacamole_user'@'localhost';"
+
+	# Mise à jour de la bdd
+	mysql -e "FLUSH PRIVILEGES;"
 
 	# Installation de l'extension
 	cp guacamole-auth-jdbc-1.4.0/mysql/guacamole-auth-jdbc-mysql-1.4.0.jar /opt/guacamole/extensions/
