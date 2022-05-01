@@ -168,7 +168,7 @@ install_mariadb()
 	# Ajouter la configuration de mariadb dans guacamole.properties
 	cat >> /etc/guacamole/guacamole.properties << EOF
 # Hôte et port
-guacd-hostname: guacamole.lyronn.local
+guacd-hostname: localhost 
 guacd-port:	4822
 
 # Parmètres MySQL
@@ -179,6 +179,13 @@ mysql-username:	guacamole_user
 mysql-password:	P@ssw0rd
 
 EOF
+	# Création guacd.conf
+	cat >> /etc/guacamole/guacd.conf << EOF
+[server]
+bind_host = 127.0.0.1
+
+EOF
+
 	# Lien entre la configuration de guacamole et le serveur tomcat
 	ln -s /etc/guacamole/guacamole.properties /usr/share/tomcat9/.guacamole
 
